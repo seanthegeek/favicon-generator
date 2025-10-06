@@ -1,6 +1,6 @@
 # favicon-generator
 
-Modern websites use a variety of different image sizes and formats to be useable on different devices and browsers, I wanted a script that would take my input SVG and generate all of the needed icons, plus a manifest to make my website a [Progressive Web Application (PWA)][PWA]. So, I turned to ChatGPT, which generated this script after some back-and-forth.
+Modern websites use a variety of different image sizes and formats to be useable on different devices and browsers. I wanted a script that would take my input SVG and generate all of the needed icons, plus a manifest to make my website a [Progressive Web Application (PWA)][PWA]. So, I turned to ChatGPT, which generated this script after some back-and-forth.
 
 ```text
 usage: favicon-generator.py [-h] [--icons-dir ICONS_DIR] [--manifest-dir MANIFEST_DIR] [--pwa-theme PWA_THEME] [--pwa-bg PWA_BG]
