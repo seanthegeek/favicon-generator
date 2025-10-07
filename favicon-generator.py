@@ -4,17 +4,17 @@ Generate favicons and PWA icons from a single SVG or PNG source.
 
 Copyright 2025 Sean Whalen
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+   http://www.apache.org/licenses/LICENSE-2.0
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 Layout (MDN-aligned):
 static/
@@ -26,6 +26,7 @@ static/
     favicon-<NxN>.png            # from --favicon-sizes (default: 16,32,48,256)
     apple-touch-icon.png         # unless --no-apple-touch
     icon-192x192.png
+    icon-256x256.png             # (tight, non-maskable)
     icon-512x512.png
     icon-maskable-512x512.png    # unless --no-maskable
     safari-pinned-tab.svg        # only if --pinned-svg provided
@@ -82,6 +83,14 @@ def center(inner: Tuple[int, int], outer: Tuple[int, int]) -> Tuple[int, int]:
     return (ox - ix) // 2, (oy - iy) // 2
 
 
+def trim_alpha(img: Image.Image) -> Image.Image:
+    """Crop transparent gutters (helps Windows taskbar sizing)."""
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+    bbox = img.split()[-1].getbbox()
+    return img.crop(bbox) if bbox else img
+
+
 # ---------- Icon writers ----------
 def save_png(img: Image.Image, path: Path, size: Tuple[int, int]) -> None:
     out = img.copy().resize(size, Image.LANCZOS)
@@ -121,10 +130,11 @@ def write_manifest(
     short: str,
     include_maskable: bool = True,
 ) -> None:
-    # MDN: src paths are relative to the manifest location.
+    # Order matters for some UAs (Windows/Edge): list tight, non-maskable first.
     icons = [
-        {"src": "icons/icon-192x192.png", "sizes": "192x192", "type": "image/png"},
         {"src": "icons/icon-512x512.png", "sizes": "512x512", "type": "image/png"},
+        {"src": "icons/icon-256x256.png", "sizes": "256x256", "type": "image/png"},
+        {"src": "icons/icon-192x192.png", "sizes": "192x192", "type": "image/png"},
     ]
     if include_maskable:
         icons.append(
@@ -151,7 +161,6 @@ def write_manifest(
 
 
 def write_browserconfig(outdir: Path, tile_color: str) -> None:
-    # Keep icon path relative to the XML location.
     xml = f"""<?xml version="1.0" encoding="utf-8"?>
 <browserconfig>
   <msapplication>
@@ -193,7 +202,7 @@ def main() -> None:
     p.add_argument(
         "--safari-pinned-color",
         default="#5bbad5",
-        help="Color used for <link rel='mask-icon' ... color=...>. Only applied if --pinned-svg is provided.",
+        help="Color for <link rel='mask-icon'>; only if --pinned-svg is provided.",
     )
     p.add_argument("--make-browserconfig", action="store_true")
     p.add_argument("--no-ico", action="store_true", help="Skip generating favicon.ico.")
@@ -211,9 +220,14 @@ def main() -> None:
         help="Skip writing site.webmanifest and omit its <link>.",
     )
     p.add_argument(
+        "--autotrim",
+        action="store_true",
+        help="Trim transparent margins before all resizes.",
+    )
+    p.add_argument(
         "--favicon-sizes",
         default="16,32,48,256",
-        help="Comma-separated PNG favicon sizes to generate (e.g., 16,32,48,96,128,256).",
+        help="Comma-separated PNG favicon sizes (e.g., 16,32,48,96,128,256).",
     )
     p.add_argument("--flask", action="store_true", help="Output Flask/Jinja paths.")
     p.add_argument(
@@ -227,6 +241,8 @@ def main() -> None:
     ensure_outdir(args.manifest_dir)
 
     img, is_svg_input = load_source_image(args.source)
+    if args.autotrim:
+        img = trim_alpha(img)
 
     # If the source is SVG, also copy it as icons/favicon.svg
     if is_svg_input:
@@ -242,8 +258,9 @@ def main() -> None:
     if not args.no_apple_touch:
         save_apple_touch(img, args.icons_dir / "apple-touch-icon.png", args.pwa_bg)
 
-    # PWA primary icons
+    # PWA primary icons (tight, non-maskable)
     save_png(img, args.icons_dir / "icon-192x192.png", (192, 192))
+    save_png(img, args.icons_dir / "icon-256x256.png", (256, 256))
     save_png(img, args.icons_dir / "icon-512x512.png", (512, 512))
 
     # Maskable icon (optional)
@@ -286,7 +303,6 @@ def main() -> None:
 
     # ---------- HTML output ----------
     def normalize_prefix(prefix: str) -> str:
-        # Empty -> root; ensure leading slash; ensure single trailing slash
         if not prefix:
             return "/"
         prefix = prefix.replace("\\", "/")
@@ -337,7 +353,7 @@ def main() -> None:
     if not args.no_manifest:
         lines.append(f'<link rel="manifest" href="{fmt("site.webmanifest")}">')
 
-    # Theme/background (still useful even without a manifest)
+    # Theme/background (useful even without a manifest)
     lines.append(f'<meta name="theme-color" content="{args.pwa_theme}">')
     lines.append(f'<meta name="background-color" content="{args.pwa_bg}">')
 
