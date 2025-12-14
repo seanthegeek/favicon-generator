@@ -38,7 +38,7 @@ import argparse
 import json
 from io import BytesIO
 from pathlib import Path
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Tuple, cast
 
 from PIL import Image
 
@@ -57,6 +57,10 @@ def load_source_image(src: Path) -> tuple[Image.Image, bool]:
         png_bytes = cairosvg.svg2png(
             url=str(src), output_width=1024, output_height=1024
         )
+        if png_bytes is None:
+            raise SystemExit("cairosvg.svg2png returned no data for the SVG input")
+        # Ensure type-checkers see a bytes object
+        png_bytes = cast(bytes, png_bytes)
         img = Image.open(BytesIO(png_bytes)).convert("RGBA")
         return img, True
     img = Image.open(src)
