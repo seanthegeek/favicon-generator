@@ -74,7 +74,7 @@ def contain(img: Image.Image, box: Tuple[int, int]) -> Image.Image:
     bw, bh = box
     scale = min(bw / w, bh / h)
     nw, nh = max(1, int(round(w * scale))), max(1, int(round(h * scale)))
-    return img.copy().resize((nw, nh), Image.LANCZOS)
+    return img.copy().resize((nw, nh), Image.LANCZOS) # pyright: ignore[reportAttributeAccessIssue]
 
 
 def center(inner: Tuple[int, int], outer: Tuple[int, int]) -> Tuple[int, int]:
@@ -93,7 +93,7 @@ def trim_alpha(img: Image.Image) -> Image.Image:
 
 # ---------- Icon writers ----------
 def save_png(img: Image.Image, path: Path, size: Tuple[int, int]) -> None:
-    out = img.copy().resize(size, Image.LANCZOS)
+    out = img.copy().resize(size, Image.LANCZOS) # pyright: ignore[reportAttributeAccessIssue]
     out.save(path, format="PNG", optimize=True)
 
 
@@ -312,15 +312,19 @@ def main() -> None:
 
     if args.flask:
         base = "{{ url_for('static', filename='"
-
-        def fmt(f):
+    
+        def _fmt_flask(f):
             return base + f + "') }}"
-
+    
+        fmt = _fmt_flask
+    
     else:
         prefix = normalize_prefix(args.public_prefix)
-
-        def fmt(f):
+    
+        def _fmt_hosted(f):
             return f"{prefix}{f}"
+    
+        fmt = _fmt_hosted
 
     lines: list[str] = []
     lines.append("<!-- === FAVICONS & PWA ICONS === -->")
